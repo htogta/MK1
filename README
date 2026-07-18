@@ -59,7 +59,7 @@ hex = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
 C-style string in program memory:
 
 ```
-@end jmp
+@end jmp3
 .start 
 $This ^20 $is ^20 $a ^20 $string! ^0a ^00 
 .end
@@ -71,7 +71,7 @@ FORTH-style string (length and address get pushed to the stack):
 
 ```
 ( -- len addr )
-@end dup jmp
+@end dup3 jmp3
 .start $This ^20 $is ^20 $a ^20 $string! ^0a .end
 @start #ffffff xor3 add3 
 @start 
