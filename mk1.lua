@@ -1,3 +1,5 @@
+math.randomseed(os.time()) -- for rng later on
+
 local function perror(msg)
   io.stderr:write(string.format("Error: %s\n", msg))
   os.exit(1)
@@ -29,6 +31,49 @@ local function tokenize(source)
   if in_comment then perror("comment never closed with ')'") end
 
   return tokens
+end
+
+-- go through the list of tokens, replacing all pseudo-instructions with their expanded forms
+local function pseudo_instructions(tokens)
+  local expanded = {} -- we append our tokens to this list afterwards
+  local callcounter = 0
+
+  -- function for generating random/unique labels for use with "call"
+  local function make_ret_label()
+    -- these are the allowed characters in our random unique labels:
+    local chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    local s = {} -- our random 8-character string will be stored in here
+    for i = 1, 8 do
+      local idx = math.random(#chars)
+      s[i] = chars:sub(idx, idx)
+    end
+
+    local output = "call-" .. table.concat(s) .. callcounter
+    callcounter = callcounter + 1
+    return output
+  end
+
+  local i = 1
+  while i <= #tokens do
+    local tok = tokens[i]
+
+    if tok == "call" then
+      local retlabel = make_ret_label()
+      table.insert(expanded, "@" .. retlabel)
+      table.insert(expanded, "psh3")
+      table.insert(expanded, "jmp3")
+      table.insert(expanded, "." .. retlabel)
+    elseif tok == "return" then
+      table.insert(expanded, "pop3")
+      table.insert(expanded, "jmp3")
+    else -- normal token
+      table.insert(expanded, tok)
+    end
+
+    i = i + 1
+  end
+
+  return expanded
 end
 
 local function handle_labels(tokens)
@@ -81,8 +126,8 @@ local function handle_labels(tokens)
     (tok:sub(1, 1) == "?" and tok:sub(2, 2) == "@") then
       local has_skip = tok:sub(1, 1) == "?"
       local label_name
-      if has_skip then label_name = tok:sub(2) else label_name = tok:sub(3) end
-      local pc_value = labels[name]
+      if has_skip then label_name = tok:sub(3) else label_name = tok:sub(2) end
+      local pc_value = labels[label_name]
       if not pc_value then perror_at(tok, "label declaration not found") end
 
       local pc_hex = string.format("%0" .. 6 .. "x", pc_value)
@@ -103,10 +148,10 @@ local function assemble(opcodes)
   local binary = {}
 
   local opmap = {
-    ADD = 0x00, AND = 0x01, XOR = 0x02, SHF = 0x03, 
-    SWP = 0x04, CMP = 0x05, STR = 0x06, LOD = 0x07, 
-    DUP = 0x08, DRP = 0x09, PSH = 0x0a, POP = 0x0b, 
-    JMP = 0x0c, LIT = 0x0d, FET = 0x0e, NOP = 0x0f,
+    add = 0x00, ["and"] = 0x01, xor = 0x02, shf = 0x03, 
+    swp = 0x04, cmp = 0x05, str = 0x06, lod = 0x07, 
+    dup = 0x08, drp = 0x09, psh = 0x0a, pop = 0x0b, 
+    jmp = 0x0c, lit = 0x0d, fet = 0x0e, nop = 0x0f,
   }
 
   local function emit_op(op, a, skip)
@@ -122,21 +167,23 @@ local function assemble(opcodes)
     local tok = opcodes[i]
     if tok:sub(1, 1) == "#" or
     (tok:sub(1, 1) == "?" and tok:sub(2, 2) == "#") then -- literal hex
+      local digits
+      if tok:sub(1, 1) == "?" then digits = tok:sub(3) else digits = tok:sub(2) end
       -- we already know that the number of digits is correct, no need to check again
-      emit_op(opmap.LIT, (#digits // 2) - 1, tok:sub(1, 1) == "?")
+      emit_op(opmap.lit, (#digits // 2) - 1, tok:sub(1, 1) == "?")
     elseif tok:sub(1, 1) == "^" then -- raw hex
       local hexstr = tok:sub(2)
       -- no need to check if it's even, we already did that
       for i = 1, #hexstr - 1, 2 do
         local bytechars = hexstr:sub(i, i + 1)
         local byte = tonumber(bytechars, 16)
-        table.insert(byte)
+        table.insert(binary, byte)
       end
     elseif tok:sub(1, 1) == "$" then -- string
       local text = tok:sub(2)
       for i = 1, #text do
         local ch = text:sub(i, i)
-        table.insert(ch:byte())
+        table.insert(binary, ch:byte())
       end
     else -- standard opcode
       local has_skip, opcode, num = tok:match("(%??)(%l%l%l)(%d)")
@@ -148,7 +195,11 @@ local function assemble(opcodes)
       end
       emit_op(opmap[opcode], tonumber(num), has_skip == "?")
     end
+
+    i = i + 1
   end
+
+  return binary
 end
 
 local function write_binary(filename, bytes)
@@ -176,6 +227,7 @@ end
 
 local source = read_source(input)
 local tokens = tokenize(source)
-local handled_labels = handle_labels(tokens)
+local no_pseudos = pseudo_instructions(tokens)
+local handled_labels = handle_labels(no_pseudos)
 local binary = assemble(handled_labels)
 write_binary(output, binary)
