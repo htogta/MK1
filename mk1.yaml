@@ -4,9 +4,10 @@ detect:
   filename: "\\.(mk1|MK1)$"
 
 rules:
-  - preproc: "\\.[^\ \n\r]+" # label declaration
-  # ^ highlighting this as a preproc is nice, since then it looks different from a normal identifier (a label push) even though semantically it's not exactly a preprocessor directive
+  # for pseudoinstructions
+  - preproc: "(call|return)($|[ \t\r\n])"
   
+  - identifier: "\\.[^\ \n\r]+" # label declaration
   - identifier: "\\??@[^\ \n\r]+" # label push
   
   - constant.string: "\\$[^\ \n\r]+" # string constant
@@ -14,7 +15,7 @@ rules:
   - constant: "\\??#[0-9A-Fa-f]{2}(?:[0-9A-Fa-f]{2}){0,3}($|[ \t\r\n])" # literal hex (must be 2, 4, 6, or 8 hex digits)
 
   # opcode mnemonic
-  - statement: "\\??(add|and|xor|shf|cmp|swp|str|lod|dup|drp|psh|pop|jmp|fet|nop)[1-4]"
+  - statement: "\\??(add|and|xor|shf|cmp|swp|str|lod|dup|drp|psh|pop|jmp|fet|nop)[1-4]($|[ \t\r\n])"
 
   # comments (a parenthesis, the spaces are REQUIRED)
   - comment:
