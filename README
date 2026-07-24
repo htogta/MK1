@@ -14,6 +14,24 @@ MK1 supports:
 - [Uxntal]-style string syntax via a `$` prefix
 - [Uxntal]-style raw hex sequences using a `^` prefix, allowing for inserting raw bytes into a program without them being pushed to the stack.
 
+MK1 also adds two new pseudo-instructions- `call` and `return`. These are handled in an initial translation phase before labels are handled in the assembly process (the phase that previously handled macros in [MK2]).
+
+`call` expands into roughly the following:
+
+```
+@return-location psh3 jmp3 .return-location
+```
+
+Where `return-location` is replaced by a generated (and random/unique) label name each time `call` is used.
+
+`return` expands into the following:
+
+```
+pop3 jmp3
+```
+
+It simply pops an address off of the return stack, and jumps to it.
+
 Grammar:
 
 ```ebnf
@@ -24,7 +42,8 @@ whitespace = " " | "\t" | "\r" | "\n" ;
 
 token = opcode
       | labeldecl
-      | labelpush
+      | labelpush , [ whitespace , { whitespace } , "call" ]
+      | "return"
       | lithex
       | rawhex
       | string ;
