@@ -32,7 +32,9 @@ pop3 jmp3
 
 It simply pops an address off of the return stack, and jumps to it.
 
-Grammar:
+If you're interested in some libraries that I've implemented in this language, check the `libs` directory.
+
+Here's a (rough) grammar for the language:
 
 ```ebnf
 program = [ tokens ] , EOF ;
@@ -73,25 +75,4 @@ byte = hex , hex ;
 hex = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
     | "a" | "b" | "c" | "d" | "e" | "f" | "A" | "B" | "C" | "D" 
     | "E" | "F" ;
-```
-
-C-style string in program memory:
-
-```
-@end jmp3
-.start 
-$This ^20 $is ^20 $a ^20 $string! ^0a ^00 
-.end
-```
-
-Where `@start` is the address of the string (note how it needs to be "skipped over" so that the null at the end doesn't terminate the program).
-
-FORTH-style string (length and address get pushed to the stack):
-
-```
-( -- len addr )
-@end dup3 jmp3
-.start $This ^20 $is ^20 $a ^20 $string! ^0a .end
-@start #ffffff xor3 add3 
-@start 
 ```

@@ -1,0 +1,337 @@
+( basic operations for things like math and stack shuffling )
+
+( TODO count to compare how many instruction bytes these take up, and see if not using the subroutine calls would be less )
+( remember- label push is 4 bytes, literal is 1 + digits/2 bytes, call is 6 bytes, and return is 2 bytes )
+( really, calling a subroutine is 6 + bytes for subroutine body + 2 bytes total for the number of cycles- anything less than 8 bytes is *guaranteed* to be better than calling a subroutine )
+
+( REGION: BITWISE OPERATIONS )
+
+.bitnot1 ( byte -- ~byte )
+  #ff xor1
+  return
+
+.bitnot2 ( short -- ~short )
+  #ffff xor2
+  return
+
+.bitnot3 ( addr -- ~addr )
+  #ffffff xor3
+  return
+
+.bitnot4 ( int -- ~int )
+  #ffffffff xor4
+  return
+
+.bitor1 ( a1 b1 -- a1|b1 )
+  @bitnot2 call ( not both bytes at once )
+  and1
+  @bitnot1 call
+  return
+
+.bitor2 ( a2 b2 -- a2|b2 )
+  @bitnot4 call
+  and2
+  @bitnot2 call
+  return
+
+.bitor3 ( a3 b3 -- a3|b3 )
+  @bitnot3 call
+  swp3 @bitnot3 call
+  and3
+  @bitnot3 call
+  return
+
+.bitor4 ( a4 b4 -- a4|b4 )
+  @bitnot4 call
+  swp4 @bitnot4 call
+  and4
+  @bitnot4 call
+  return
+
+( REGION: ARITHMETIC OPERATIONS )
+
+.neg1 ( byte -- -byte )
+  @bitnot1 call #01 add1
+  return
+
+.neg2 ( short -- -short )
+  @bitnot2 call #0001 add2
+  return
+
+.neg3 ( addr -- -addr )
+  @bitnot3 call #000001 add3
+  return
+
+.neg4 ( int -- -int )
+  @bitnot4 call #00000001 add4
+  return
+
+.sub1 ( a1 b1 -- a1-b1 )
+  @neg1 call add1
+  return
+
+.sub2 ( a2 b2 -- a2-b2 )
+  @neg2 call add2
+  return
+
+.sub3 ( a3 b3 -- a3-b3 )
+  @neg3 call add3
+  return
+
+.sub4 ( a4 b4 -- a4-b4 )
+  @neg4 call add4
+  return
+
+( REGION: COMPARISON OPERATIONS )
+
+.neq1 ( a1 b1 -- bool ) ( ff if a!=b, otherwise 00 )
+  cmp1 ( 0 if equal, otherwise 01 or ff )
+  #01 and1 ( 0 if equal, 01 otherwise )
+  @neg1 call ( 0 if equal, ff otherwise )
+  return
+
+.eq1 ( a1 b1 -- bool ) ( ff if a=b, otherwise 00 )
+  @neq1 call
+  @bitnot1 call
+  return
+
+.gt1 ( a1 b1 -- bool ) ( ff if a>b, otherwise 00 )
+  cmp1 ( 1 if a>b, otherwise 00 if a=b or ff if a<b )
+  #01 @eq1 call
+  return
+
+.gteq1 ( a1 b1 -- bool )
+  cmp1 ( 0 or 1 if a>=b, ff otherwise )
+  #02 and1 ( 0 if a>=b, 2 otherwise )
+  #02 cmp1 ( ff if a>=b, 0 otherwise )
+  return
+
+.lt1 ( a1 b1 -- bool ) ( ff if a<b, otherwise 00 )
+  @gteq1 call @bitnot1 call
+  return
+
+.lteq1 ( a1 b1 -- bool ) ( ff if a<=b, otherwise 00 )
+  @gt1 call @bitnot1 call
+  return
+
+.neq2 ( a2 b2 -- bool ) ( ff if a!=b, otherwise 00 )
+  cmp2 ( 0 if equal, otherwise 01 or ff )
+  #01 and1 ( 0 if equal, 01 otherwise )
+  @neg1 call ( 0 if equal, ff otherwise )
+  return
+
+.eq2 ( a2 b2 -- bool ) ( ff if a=b, otherwise 00 )
+  @neq2 call
+  @bitnot1 call
+  return
+
+.gt2 ( a2 b2 -- bool ) ( ff if a>b, otherwise 00 )
+  cmp2 ( 1 if a>b, otherwise 00 if a=b or ff if a<b )
+  #01 @eq1 call
+  return
+
+.gteq2 ( a2 b2 -- bool )
+  cmp2 ( 0 or 1 if a>=b, ff otherwise )
+  #02 and1 ( 0 if a>=b, 2 otherwise )
+  #02 cmp1 ( ff if a>=b, 0 otherwise )
+  return
+
+.lt2 ( a2 b2 -- bool ) ( ff if a<b, otherwise 00 )
+  @gteq2 call @bitnot2 call
+  return
+
+.lteq2 ( a2 b2 -- bool ) ( ff if a<=b, otherwise 00 )
+  @gt2 call @bitnot1 call
+  return
+
+.neq3 ( a3 b3 -- bool ) ( ff if a!=b, otherwise 00 )
+  cmp3 ( 0 if equal, otherwise 01 or ff )
+  #01 and1 ( 0 if equal, 01 otherwise )
+  @neg1 call ( 0 if equal, ff otherwise )
+  return
+
+.eq3 ( a3 b3 -- bool ) ( ff if a=b, otherwise 00 )
+  @neq3 call
+  @bitnot1 call
+  return
+
+.gt3 ( a3 b3 -- bool ) ( ff if a>b, otherwise 00 )
+  cmp3 ( 1 if a>b, otherwise 00 if a=b or ff if a<b )
+  #01 @eq1 call
+  return
+
+.gteq3 ( a3 b3 -- bool )
+  cmp3 ( 0 or 1 if a>=b, ff otherwise )
+  #02 and1 ( 0 if a>=b, 2 otherwise )
+  #02 cmp1 ( ff if a>=b, 0 otherwise )
+  return
+
+.lt3 ( a3 b3 -- bool ) ( ff if a<b, otherwise 00 )
+  @gteq3 call @bitnot1 call
+  return
+
+.lteq3 ( a3 b3 -- bool ) ( ff if a<=b, otherwise 00 )
+  @gt3 call @bitnot1 call
+  return
+
+.neq4 ( a4 b4 -- bool ) ( ff if a!=b, otherwise 00 )
+  cmp4 ( 0 if equal, otherwise 01 or ff )
+  #01 and1 ( 0 if equal, 01 otherwise )
+  @neg1 call ( 0 if equal, ff otherwise )
+  return
+
+.eq4 ( a4 b4 -- bool ) ( ff if a=b, otherwise 00 )
+  @neq4 call
+  @bitnot1 call
+  return
+
+.gt4 ( a4 b4 -- bool ) ( ff if a>b, otherwise 00 )
+  cmp4 ( 1 if a>b, otherwise 00 if a=b or ff if a<b )
+  #01 @eq1 call
+  return
+
+.gteq4 ( a4 b4 -- bool )
+  cmp4 ( 0 or 1 if a>=b, ff otherwise )
+  #02 and1 ( 0 if a>=b, 2 otherwise )
+  #02 cmp1 ( ff if a>=b, 0 otherwise )
+  return
+
+.lt4 ( a4 b4 -- bool ) ( ff if a<b, otherwise 00 )
+  @gteq4 call @bitnot1 call
+  return
+
+.lteq4 ( a4 b4 -- bool ) ( ff if a<=b, otherwise 00 )
+  @gt4 call @bitnot1 call
+  return
+
+( REGION: BOOLEAN OPERATIONS )
+
+.tobool1 ( n1 -- bool ) ( if byte is nonzero, push ff, else 00 )
+  #00 @neq1 call
+  return
+
+.tobool2 ( n2 -- bool ) ( if short is nonzero, push ff )
+  #0000 @neq2 call
+  return
+
+.tobool3 ( n3 -- bool )
+  #000000 @neq3 call
+  return
+
+.tobool4 ( n4 -- bool )
+  #00000000 @neq4 call
+  return
+
+( NOTE the following 3 subroutines may not be necessary )
+.booland ( bool bool -- bool )
+  and1
+  return
+
+.boolor ( bool bool -- bool )
+  @bitor1 call
+  return
+
+.boolnot ( bool -- bool )
+  @bitnot1 call
+  return
+
+( REGION: HELPERS FOR CONDITIONALS )
+
+( remember this idiom: )
+( let's say the stack is [bool T F], then with this: )
+( ?swp3 swp3 drp3 )
+( if bool is true, then T is what remains on the stack, otherwise F is what remains on the stack )
+( it's basically a "swap? nip" )
+( anyways, I call it "which" )
+
+.which1 ( bool t1 f1 -- x1 ) ( x=t if bool is true, otherwise x=f )
+  ?swp1 swp1 drp1
+  return
+
+.which2 ( bool t2 f2 -- x2 )
+  ?swp2 swp2 drp2
+  return
+
+.which3 ( bool t3 f3 -- x3 )
+  ?swp3 swp3 drp3
+  return
+
+.which4 ( bool t4 f4 -- x4 )
+  ?swp4 swp4 drp4
+  return
+
+( call true-sub if bool is true, otherwise call false-sub )
+.choose ( ... bool true-sub false-sub -- ... )
+  @which3 call call
+  return
+
+( call sub if bool is true, otherwise continue )
+.if ( ... bool sub -- ... )
+  psh3
+  @boolnot call
+  @end_if_subroutine ?jmp3
+    drp3 pop3 call
+    return
+  .end_if_subroutine
+    pop3 drp3
+    return
+
+( REGION: STACK SHUFFLING )
+
+.over1 ( a1 b1 -- a1 b1 a1 )
+  psh1 dup1 pop1 swp1
+  return
+  
+.over2 ( a2 b2 -- a2 b2 a2 )
+  psh2 dup2 pop2 swp2
+  return
+  
+.over3 ( a3 b3 -- a3 b3 a3 )
+  psh3 dup3 pop3 swp3
+  return
+  
+.over4 ( a4 b4 -- a4 b4 a4 )
+  psh4 dup4 pop4 swp4
+  return
+
+.rot1 ( a1 b1 c1 -- b1 c1 a1 )
+  psh1 swp1 ( b1 a1 ) ( c1 )
+  pop1 swp1 ( b1 c1 a1 )
+  return
+
+.rot2 ( a2 b2 c2 -- b2 c2 a2 )
+  psh2 swp2
+  pop2 swp2
+  return
+
+.rot3 ( a3 b3 c3 -- b3 c3 a3 )
+  psh3 swp3
+  pop3 swp3
+  return
+
+.rot4 ( a4 b4 c4 -- b4 c4 a4 )
+  psh4 swp4
+  pop4 swp4
+  return
+
+( REGION: UNIFIED PTR TYPES )
+
+( we can define a generic "address" type for both addresses in RAM and ROM like so: )
+( bool n3 )
+( if the bool is 00, then it's in RAM, if it's ff, then it's in ROM )
+
+.get ( bool n3 -- b1 )
+  psh3
+  @if_rom_addr_get @if_ram_addr_get @which3 call jmp3
+  .if_rom_addr_get
+    pop3 fet1 return
+  .if_ram_addr_get
+    pop3 lod1 return
+
+.set ( b1 bool n3 -- )
+  psh3
+  @if_rom_addr_set @if_ram_addr_set @which3 call jmp3
+  .if_rom_addr_set
+    pop3 drp4 return ( do nothing, can't write to ROM )
+  .if_ram_addr_set
+    pop3 str3 return ( write to RAM )
