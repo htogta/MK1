@@ -87,7 +87,9 @@ local function handle_labels(tokens)
 
     if tok:sub(1, 1) == "." then -- label declaration
       local label_name = tok:sub(2)
-      labels[label_name] = pc
+      local exists = labels[label_name]
+      if exists then perror_at(tok, "label defined twice")
+      else labels[label_name] = pc end
     elseif tok:sub(1, 1) == "@" or 
     (tok:sub(1, 1) == "?" and tok:sub(2, 2) == "@") then -- label push
       pc = pc + 1 + 3 -- 1 byte for LIT, plus 3 for word
