@@ -32,19 +32,24 @@ pop3 jmp3
 
 It simply pops an address off of the return stack, and jumps to it.
 
-If you're interested in some libraries that I've implemented in this language, check the `libs` directory.
-
 Here's a (rough) grammar for the language:
 
 ```ebnf
-program = [ tokens ] , EOF ;
+program = [ code ] , EOF ;
 
-tokens = token , { whitespace , { whitespace } , token } ;
+comment = "(" , whitespace , { whitespace } ,
+          ? any character except ")" ? ,
+          whitespace , { whitespace } , ")" ;
+
+code = ( token | comment ) , 
+       { whitespace , { whitespace } , ( token | comment ) } ;
+
 whitespace = " " | "\t" | "\r" | "\n" ;
 
 token = opcode
       | labeldecl
-      | labelpush , [ whitespace , { whitespace } , "call" ]
+      | labelpush
+      | "call"
       | "return"
       | lithex
       | rawhex
@@ -61,7 +66,7 @@ labelpush = [ "?" ] , "@" , text ;
 string = "$" , text ;
 
 text = char , { char } ;
-char = ? any printable non-whitespace character ?
+char = ? any printable non-whitespace character ? ;
 
 lithex = [ "?" ] , "#" , lithexsequence ;
 lithexsequence = byte
