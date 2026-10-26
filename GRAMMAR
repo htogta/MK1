@@ -1,0 +1,57 @@
+Here's a rough outline of MK1's grammar in EBNF:
+
+(Note: still need to add the anonymous labels)
+
+```
+program = [ code ] , EOF ;
+
+code = instruction , { whitespace , { whitespace } , instruction } ;
+
+instruction = token | anon | comment ;
+
+comment = "(" , whitespace , { whitespace } ,
+          ? any character except ")" ? ,
+          whitespace , { whitespace } , ")" ;
+
+(* note that "start" and "end" can only occur inside an anonymous label block *)
+anon = "[" , whitespace , { whitespace } ,
+        { ( instruction | "start" | "end" ) , whitespace , { whitespace } }
+        "]" ;
+
+whitespace = " " | "\t" | "\r" | "\n" ;
+
+token = opcode
+      | labeldecl
+      | labelpush
+      | "call"
+      | "return"
+      | lithex
+      | rawhex
+      | string ;
+
+opcode = [ "?" ] , mnemonic , ( "1" | "2" | "3" | "4" ) ;
+mnemonic = "add" | "and" | "xor" | "shf" 
+         | "cmp" | "swp" | "str" | "lod" 
+         | "dup" | "drp" | "psh" | "pop" 
+         | "jmp" | "fet" | "nop" ;
+
+labeldecl = "." , text ;
+labelpush = [ "?" ] , "@" , text ;
+string = "$" , text ;
+
+text = char , { char } ;
+char = ? any printable non-whitespace character ? ;
+
+lithex = [ "?" ] , "#" , lithexsequence ;
+lithexsequence = byte
+               | ( byte , byte )
+               | ( byte , byte , byte )
+               | ( byte , byte , byte , byte ) ;
+
+rawhex = "^" , byte , { byte } ;
+
+byte = hex , hex ;
+hex = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+    | "a" | "b" | "c" | "d" | "e" | "f" | "A" | "B" | "C" | "D" 
+    | "E" | "F" ;
+```

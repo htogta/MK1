@@ -38,7 +38,7 @@ local function pseudo_instructions(tokens)
   local expanded = {} -- we append our tokens to this list afterwards
   local callcounter = 0
 
-  -- function for generating random/unique labels for use with "call"
+  -- function for generating random/unique labels for use with "call" and other pseudoinstructions
   local function make_ret_label()
     -- these are the allowed characters in our random unique labels:
     local chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -48,17 +48,27 @@ local function pseudo_instructions(tokens)
       s[i] = chars:sub(idx, idx)
     end
 
-    local output = "call-" .. table.concat(s) .. callcounter
+    local output = table.concat(s) .. callcounter
     callcounter = callcounter + 1
     return output
   end
+
+  -- here we'll implement the label stack that we'll use for anonymous labels
+  local anon_stack = {}
+  local function anon_peek() return anon_stack[#anon_stack] end
+  local function anon_push(lbl) table.insert(anon_stack, lbl) end
+  local function anon_pop()
+    if #anon_stack <= 0 then return nil
+    else return table.remove(anon_stack) end
+  end
+  local function anon_is_empty(lbl) return #anon_stack <= 0 end
 
   local i = 1
   while i <= #tokens do
     local tok = tokens[i]
 
     if tok == "call" then
-      local retlabel = make_ret_label()
+      local retlabel = "call_" .. make_ret_label()
       table.insert(expanded, "@" .. retlabel)
       table.insert(expanded, "psh3")
       table.insert(expanded, "jmp3")
@@ -66,13 +76,59 @@ local function pseudo_instructions(tokens)
     elseif tok == "return" then
       table.insert(expanded, "pop3")
       table.insert(expanded, "jmp3")
+    elseif tok == "[" then
+      -- make a new label
+      local quotename = make_ret_label()
+      anon_push(quotename)
+
+      -- now insert the proper code
+      table.insert(expanded, "@anon_end_" .. quotename)
+      table.insert(expanded, "jmp3")
+      table.insert(expanded, ".anon_start_" .. quotename)
+    elseif tok == "]" then
+      local quotename = anon_pop()
+      if not quotename then
+        perror("closing bracket but no opening bracket")
+      end
+      
+      -- now insert the proper code
+      table.insert(expanded, ".anon_end_" .. quotename)
+      table.insert(expanded, "@anon_start_" .. quotename)
+      in_brackets = false
+    elseif tok == "start" then
+      if anon_is_empty() then 
+        perror_at("start", "can only occur within brackets") 
+      end
+      
+      local quotename = anon_peek()
+      table.insert(expanded, "@anon_start_" .. quotename)
+    elseif tok == "end" then
+      if anon_is_empty() then 
+        perror_at("end", "can only occur within brackets") 
+      end
+      
+      local quotename = anon_peek()
+      table.insert(expanded, "@anon_end_" .. quotename)
+    elseif tok:sub(1, 1) == "." then
+      local lbltext = tok:sub(2)
+      table.insert(expanded, "." .. "lbl_" .. lbltext)
+    elseif tok:sub(1, 1) == "@" then
+      local lbltext = tok:sub(2)
+      table.insert(expanded, "@" .. "lbl_" .. lbltext)
+    elseif tok:sub(1, 2) == "?@" then
+      local lbltext = tok:sub(3)
+      table.insert(expanded, "?@" .. "lbl_" .. lbltext)
     else -- normal token
       table.insert(expanded, tok)
     end
 
     i = i + 1
   end
-
+  
+  if not anon_is_empty() then
+    perror("there is an opening bracket that's missing a closing bracket")
+  end
+  
   return expanded
 end
 
@@ -159,7 +215,7 @@ local function assemble(opcodes)
   local function emit_op(op, a, skip)
     local instr = 0x80
     if skip then instr = instr | 0x40 end
-    instr = instr | (a & 0x03 << 4)
+    instr = instr | ((a & 0x03) << 4)
     instr = instr | (op & 0x0f)
     table.insert(binary, instr)
   end
@@ -173,6 +229,12 @@ local function assemble(opcodes)
       if tok:sub(1, 1) == "?" then digits = tok:sub(3) else digits = tok:sub(2) end
       -- we already know that the number of digits is correct, no need to check again
       emit_op(opmap.lit, (#digits // 2) - 1, tok:sub(1, 1) == "?")
+      -- #000000 should be 1 0 10 1101 TODO remove
+      for i = 1, #digits - 1, 2 do -- TODO this should emit literals?
+        local bytechars = digits:sub(i, i + 1)
+        local byte = tonumber(bytechars, 16)
+        table.insert(binary, byte)
+      end
     elseif tok:sub(1, 1) == "^" then -- raw hex
       local hexstr = tok:sub(2)
       -- no need to check if it's even, we already did that
@@ -195,7 +257,7 @@ local function assemble(opcodes)
       if not num then
         perror_at(tok, "missing number suffix after mnemonic")
       end
-      emit_op(opmap[opcode], tonumber(num), has_skip == "?")
+      emit_op(opmap[opcode], tonumber(num) - 1, has_skip == "?")
     end
 
     i = i + 1
