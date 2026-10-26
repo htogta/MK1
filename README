@@ -9,3 +9,7 @@ To read more about the language itself, see the [OVERVIEW].
 
 For a rough outline of the grammar in EBNF, see [GRAMMAR].
 
+If you'd like to see a standard library for using MK1 within [rainbows], look [here].
+
+[rainbows]: https://github.com/htogta/rainbows
+[here]: https://github.com/htogta/MK1-stdlib
